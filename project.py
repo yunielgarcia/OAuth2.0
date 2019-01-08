@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, jsonify, url_for, flash
 from sqlalchemy import create_engine, asc
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, scoped_session
 from database_setup import Base, Restaurant, MenuItem, User
 from flask import session as login_session
 import random
@@ -24,8 +24,10 @@ APPLICATION_NAME = "Restaurant Menu Application"
 engine = create_engine('sqlite:///restaurantmenuwithusers.db')
 Base.metadata.bind = engine
 
-DBSession = sessionmaker(bind=engine)
-session = DBSession()
+# DBSession = sessionmaker(bind=engine)
+# session = DBSession()
+
+session = scoped_session(sessionmaker(bind=engine))
 
 
 # Create anti-forgery state token
@@ -59,7 +61,7 @@ def gconnect():
         # print('error FlowExchangeError')
         return response
 
-    import pdb;pdb.set_trace()
+    # import pdb;pdb.set_trace()
     access_token = credentials.access_token
     url = ('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=%s'
            % access_token)
@@ -74,6 +76,7 @@ def gconnect():
 
     # Verify that the access token is used for the intended user.
     gplus_id = credentials.id_token['sub']
+
     if result['user_id'] != gplus_id:
         response = make_response(
             json.dumps("Token's user ID doesn't match given user ID."), 401)
@@ -97,11 +100,11 @@ def gconnect():
         return response
 
     # Store the access token in the session for later use.
-    login_session['credentials'] = credentials
+    # login_session['credentials'] = credentials
     login_session['access_token'] = credentials.access_token
     login_session['gplus_id'] = gplus_id
 
-    import pdb;pdb.set_trace()
+    # import pdb;pdb.set_trace()
 
     # Get user info
     userinfo_url = "https://www.googleapis.com/oauth2/v1/userinfo"
@@ -132,12 +135,13 @@ def gconnect():
     print("done!")
     return output
 
+
 # User Helper Functions
 
 
 def createUser(login_session):
     newUser = User(name=login_session['username'], email=login_session[
-                   'email'], picture=login_session['picture'])
+        'email'], picture=login_session['picture'])
     session.add(newUser)
     session.commit()
     user = session.query(User).filter_by(email=login_session['email']).one()
@@ -175,7 +179,10 @@ def gdisconnect():
     # import pdb;pdb.set_trace()
     # result = requests.get(url)
 
-    result = h.request(url, 'GET')
+    # result = h.request(url, 'GET')
+    result = requests.post(url='https://accounts.google.com/o/oauth2/revoke', params={'access_token': access_token},
+                           headers={'content-type': 'application/x-www-form-urlencoded'})
+
     print('result is ')
     print(result)
     import pdb;pdb.set_trace()
@@ -347,4 +354,4 @@ def deleteMenuItem(restaurant_id, menu_id):
 if __name__ == '__main__':
     app.secret_key = 'super_secret_key'
     app.debug = True
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=8000)
